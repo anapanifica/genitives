@@ -1,0 +1,190 @@
+---
+title: "Word order"
+output:
+  html_notebook: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r}
+library("tidyverse")
+library(lme4)
+setwd("/Users/apanova/OneDrive/Documents/ConLab/WordOrder/WordOrder_R")
+```
+
+#Daghestanian Russian
+
+##Data preparation
+
+```{r}
+gen <- read.csv("gen_26022021.csv")
+gen
+```
+
+
+```{r}
+gen$head_lexical_class <- relevel(gen$head_lexical_class, "non_kinship")
+gen$gen_lexical_class <- relevel(gen$gen_lexical_class, "non_human")
+gen$gender <- relevel(gen$gender,"m")
+#gen$education <- relevel(gen$education,"unknown")
+gen$gen_referentiality <- relevel(gen$gen_referentiality,"non_definite")
+gen$gen_length <- relevel(gen$gen_length,"one-word")
+gen$head_length <- relevel(gen$head_length,"multi-word")
+gen$givenness <- relevel(gen$givenness,"other")
+#gen$gen_individuation <- relevel(gen$gen_individuation,"sg")
+gen$year_of_birth <- relevel(gen$year_of_birth, "<1950")
+```
+
+
+##Logistic regression
+
+
+###Full model
+
+```{r}
+model1 <- glmer (position ~ gen_lexical_class + head_lexical_class + education + 
+                   gender + gen_referentiality + language_family + year_of_birth +
+                   gen_individuation + gen_length + head_length + givenness + 
+                   (1|speaker), data = gen, family ="binomial", control = glmerControl(optimizer ="bobyqa"))
+summary(model1)
+```
+
+###Step-wise selection procedure
+
+```{r}
+drop1(model1)
+```
+
+```{r}
+#without year of birth
+model2 <- glmer (position ~ gen_lexical_class + head_lexical_class + education + 
+                   gender + gen_referentiality + language_family + 
+                   gen_individuation + gen_length + head_length + givenness + 
+                   (1|speaker), data = gen, family ="binomial", control = glmerControl(optimizer ="bobyqa"))
+drop1(model2)
+```
+
+```{r}
+#without givenness
+model3 <- glmer (position ~ gen_lexical_class + head_lexical_class + education + 
+                   gender + gen_referentiality + language_family + 
+                   gen_individuation + gen_length + head_length + 
+                   (1|speaker), data = gen, family ="binomial", control = glmerControl(optimizer ="bobyqa"))
+drop1(model3)
+```
+
+```{r}
+#without language family
+model4 <- glmer (position ~ gen_lexical_class + head_lexical_class + education + 
+                   gender + gen_referentiality + 
+                   gen_individuation + gen_length + head_length + 
+                   (1|speaker), data = gen, family ="binomial", control = glmerControl(optimizer ="bobyqa"))
+drop1(model4)
+```
+
+```{r}
+#without gen_individuation
+model5 <- glmer (position ~ gen_lexical_class + head_lexical_class + education + 
+                   gender + gen_referentiality + 
+                   gen_length + head_length + 
+                   (1|speaker), data = gen, family ="binomial", control = glmerControl(optimizer ="bobyqa"))
+drop1(model5)
+```
+
+```{r}
+#without education
+model6 <- glmer (position ~ gen_lexical_class + head_lexical_class + 
+                   gender + gen_referentiality + 
+                   gen_length + head_length + 
+                   (1|speaker), data = gen, family ="binomial", control = glmerControl(optimizer ="bobyqa"))
+drop1(model6)
+```
+
+
+```{r}
+#without head_length
+model7 <- glmer (position ~ gen_lexical_class + head_lexical_class + 
+                   gender + gen_referentiality + 
+                   gen_length + 
+                   (1|speaker), data = gen, family ="binomial", control = glmerControl(optimizer ="bobyqa"))
+drop1(model7)
+```
+
+###Optimal model
+
+
+```{r}
+summary(model7)
+```
+
+###Visualization of the optimal model
+
+```{r}
+library(sjPlot)
+library(sjlabelled)
+library(sjmisc)
+library(ggplot2)
+```
+
+```{r}
+plot_model(model7, type = "est", show.values = TRUE, sort.est = TRUE, value.offset = .3)
+```
+
+
+##Random forest
+
+```{r}
+library("party")
+```
+
+
+parameters from the optimal model
+
+```{r}
+gen_rf <- cforest(position ~ gen_lexical_class + head_lexical_class + gender + gen_referentiality + gen_length, data = gen, controls = cforest_unbiased(ntree = 1000, mtry = 2))
+gen_varimp <- varimp(gen_rf, conditional = TRUE)
+dotchart(sort(gen_varimp), main = "Conditional importance of variables")
+```
+
+all parameters
+
+```{r}
+gen_rf <- cforest(position ~ gen_lexical_class + head_lexical_class + education + 
+                   gender + gen_referentiality + language_family + year_of_birth +
+                   gen_individuation + gen_length + head_length + givenness, data = gen,
+                  controls = cforest_unbiased(ntree = 1000, mtry = 2))
+gen_varimp <- varimp(gen_rf, conditional = TRUE)
+dotchart(sort(gen_varimp), main = "Conditional importance of variables")
+```
+
+#Standard Russian
+
+##Preparation of the data
+
+```{r}
+gen_std <- read.csv("gen_std.csv")
+gen_std
+```
+
+
+```{r}
+gen_std$head_lexical_class <- relevel(gen_std$head_lexical_class, "non_kinship")
+gen_std$gen_lexical_class <- relevel(gen_std$gen_lexical_class, "non_human")
+gen_std$gen_referentiality <- relevel(gen_std$gen_referentiality,"non_definite")
+gen_std$gen_length <- relevel(gen_std$gen_length,"one-word")
+```
+
+
+##Random forest
+
+```{r}
+gen_std_rf <- cforest(position ~ gen_lexical_class + head_lexical_class + gen_referentiality + gen_length, data = gen_std, controls = cforest_unbiased(ntree = 500, mtry = 2))
+gen_std_varimp <- varimp(gen_std_rf, conditional = TRUE)
+dotchart(sort(gen_std_varimp), main = "Conditional importance of variables")
+```
+
+
+
+
+
